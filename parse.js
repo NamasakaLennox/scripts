@@ -1,0 +1,19 @@
+#!/usr/bin/node
+
+const fs = require('fs')
+
+const text = fs.readFileSync('uris.txt');
+const json = JSON.parse(text)
+
+const edges = json.data.viewer.records.edges;
+
+const URIs = [];
+
+for (let edge of edges) {
+    // v=
+    let URI = edge.node.uris[0]
+    URI.match(/\?v=.+/) ? URIs.push(URI) : URIs.push(edge.node.uris[1])
+}
+
+console.log(URIs.length)
+fs.writeFileSync('out.txt', JSON.stringify(URIs, null, 1))
