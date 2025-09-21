@@ -2,76 +2,58 @@
 
 import requests
 from bs4 import BeautifulSoup
+import re
 
-def fetch_url_html(url, timeout=10):
+
+def fetch_characters(url):
+    """Fetch characters with positions from a Google Doc table."""
     try:
-        response = requests.get(url, timeout=timeout)
+        response = requests.get(url)
         response.raise_for_status()
-        return response.text
     except requests.RequestException as e:
-        print(f"Error fetching URL '{url}': {e}")
-        return None
+        print(f"Request failed: {e}")
+        return []
 
-def extract_character_positions(html):
-    soup = BeautifulSoup(html, "html.parser")
-    positions = []
+    soup = BeautifulSoup(response.content, "html.parser")
+    table = soup.find("table")
+    if not table:
+        print("No table found in document.")
+        return []
 
-    # Google Docs specific parsing
-    for row in soup.select("table tbody tr"):
-        cells = row.find_all("td")
-        if len(cells) < 3:
-            continue
+    pattern = re.compile(r"(\d+)(\D)(\d+)")
+    characters = []
 
-        try:
-            x_pos = int(cells[0].get_text(strip=True))
-            char = cells[1].get_text(strip=True)
-            y_pos = int(cells[2].get_text(strip=True))
+    for row in table.find_all("tr"):
+        row_text = "".join(cell.get_text(strip=True) for cell in row.find_all(["td", "th"]))
+        match = pattern.match(row_text)
+        if match:
+            characters.append({
+                "x": int(match.group(1)),
+                "char": match.group(2),
+                "y": int(match.group(3)),
+            })
 
-            if (
-                char 
-                and len(char) == 1 
-                and not char.isspace()
-            ):
-                positions.append({"x": x_pos, "y": y_pos, "char": char})
-        except ValueError:
-            # Skip invalid rows
-            continue
+    return characters
 
-    return positions
 
-def print_character_grid(positions):
-    if not positions:
-        print("No characters to display.")
+def render_grid(characters):
+    """Render characters in a 2D grid based on their coordinates."""
+    if not characters:
+        print("No characters to render.")
         return
 
-    # Calculate grid boundaries
-    xs = [p["x"] for p in positions]
-    ys = [p["y"] for p in positions]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    max_x = max(c["x"] for c in characters)
+    max_y = max(c["y"] for c in characters)
+    grid = [[" "] * (max_x + 1) for _ in range(max_y + 1)]
 
-    # Create grid filled with spaces
-    width = max_x - min_x + 1
-    height = max_y - min_y + 1
-    grid = [[" " for _ in range(width)] for _ in range(height)]
+    for c in characters:
+        grid[max_y - c["y"]][c["x"]] = c["char"]
 
-    # Place characters in grid
-    for pos in positions:
-        y_index = pos["y"] - min_y
-        x_index = pos["x"] - min_x
-        if 0 <= y_index < height and 0 <= x_index < width:
-            grid[y_index][x_index] = pos["char"]
-
-    # Print from top to bottom (reverse y-axis)
-    for row in reversed(grid):
+    for row in grid:
         print("".join(row))
 
-def fetch_parse_and_render(url):
-    html = fetch_url_html(url)
-    if html:
-        positions = extract_character_positions(html)
-        print_character_grid(positions)
 
-# Example usage
-url = ""
-fetch_parse_and_render(url)
+if __name__ == "__main__":
+    doc_url = "https://docs.google.com/document/d/e/2PACX-1vTMOmshQe8YvaRXi6gEPKKlsC6UpFJSMAk4mQjLm_u1gmHdVVTaeh7nBNFBRlui0sTZ-snGwZM4DBCT/pub"
+    chars = fetch_characters(doc_url)
+    render_grid(chars)
