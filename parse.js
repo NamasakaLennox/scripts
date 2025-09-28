@@ -10,7 +10,7 @@ const edges = json.data.viewer.records.edges;
 const URIs = [];
 
 for (let edge of edges) {
-    // v=
+
     let URI = edge.node.uris[0]
     URI.match(/\?v=.+/) ? URIs.push(URI) : URIs.push(edge.node.uris[1])
 }
